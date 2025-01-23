@@ -3,37 +3,49 @@ package processor
 import (
 	// "encoding/json"
 	// "log"
-	"sync"
+	"context"
 	"math/rand"
-	"os"
+	"sync"
 	"time"
+
 	"github.com/Asladck/ProjectGoRoutines/order"
 )
 
 
-func GenerateOrders(orderChan chan <- order.Order, boolChan <- chan  bool,wg sync.WaitGroup) {
+func GenerateOrders(ctx context.Context, orderChan chan <- order.Order,wg *sync.WaitGroup) {
+	defer wg.Done()
 	list := []string{"Bag","Car","Cow","Dota2"}
-	n:=0
+	idCounter :=0 
+	for{
+	idCounter++
 	select{
-	
-	case <- boolChan:
+	case <- ctx.Done():
 		return
 	default :
-		n++
 			orderChan <- order.Order{
-				Id:       n,
-				Item:     list[int(rand.Float64()*4)],
-				Quantity: int(rand.Float64()*20),
+				Id:       idCounter,
+				Item:     list[rand.Intn(len(list))],
+				Quantity: rand.Intn(20)+1,
 				TimeStamp: time.Now(),
 		}
+		time.Sleep(1000 * time.Millisecond)
 	}
-	wg.Done()
+	}
 }
-func ProcessOrders(orderChan <-chan order.Order,boolChan <- chan  bool){
-		select{
-		case <- boolChan:
+func ProcessOrders(ctx context.Context,orderChan <-chan order.Order,wg *sync.WaitGroup){
+	var mu sync.Mutex
+	defer wg.Done()
+	for{	
+	select{
+		case <- ctx.Done():
 			return 
-		case v := <- orderChan:
-			os.WriteFile("data/data.json",v.ToJson(),0644)
+		case v,ok := <- orderChan:
+			if !ok{
+				return
+			}
+			mu.Lock()
+			v.ToJson()
+			mu.Unlock()
 		}
 	}
+}

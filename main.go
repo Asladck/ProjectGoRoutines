@@ -2,6 +2,8 @@
 package main
 
 import (
+	"context"
+	"fmt"
 	"log"
 	"sync"
 	"time"
@@ -11,25 +13,26 @@ import (
 )
 
 func main() {
-	
-	log.Println("Запуск системы обработки заказов...\n")
+	fmt.Println("Запуск системы обработки заказов...\n")
 
-	orderChannel := make(chan order.Order, 5) // Буферизированный канал заказов
-	quitChannel := make(chan bool)
+	orderChannel := make(chan order.Order,10)// Буферизированный канал заказов
+	ctx,cancel := context.WithCancel(context.Background())
 	var wg sync.WaitGroup
-	for i:=0;i<5;i++{
-	wg.Add(1)
-	go processor.GenerateOrders(orderChannel, quitChannel,wg)
+	for i:=0;i<3;i++{
+		wg.Add(1)
+			go processor.GenerateOrders(ctx, orderChannel,&wg)		
 	}
 	log.Println("Generating orders...")
-	wg.Wait()
-	for i:=0;i<5;i++{
-	go processor.ProcessOrders(orderChannel, quitChannel)
+	for i:=0;i<3;i++{
+		wg.Add(1)
+		
+			go processor.ProcessOrders(ctx, orderChannel,&wg)	
+
 	}
 	// Р`аботаем 10 секунд, потом останавливаемся
-	time.Sleep(10 * time.Second)
-	quitChannel <- true
-	quitChannel <- true // Останавливаем обе горутины
-	
+	time.Sleep(5 * time.Second)
+	cancel()
+	wg.Wait()
+	close(orderChannel)
 	log.Println("Система завершена.")
 }
