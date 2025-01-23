@@ -2,6 +2,8 @@
 package main
 
 import (
+	"log"
+	"sync"
 	"time"
 
 	"github.com/Asladck/ProjectGoRoutines/order"
@@ -10,27 +12,24 @@ import (
 
 func main() {
 	
-	print("Запуск системы обработки заказов...\n")
+	log.Println("Запуск системы обработки заказов...\n")
 
 	orderChannel := make(chan order.Order, 5) // Буферизированный канал заказов
 	quitChannel := make(chan bool)
-
-	// Запускаем генерацию заказов
-	go processor.GenerateOrders(orderChannel, quitChannel)
-	v := order.Order{
-		id : 2,
-		item : "",
-		quantity : 3,
-		timeStamp : time.Second,
+	var wg sync.WaitGroup
+	for i:=0;i<5;i++{
+	wg.Add(1)
+	go processor.GenerateOrders(orderChannel, quitChannel,wg)
 	}
-	print(v)
-	// Запускаем обработку заказов
+	log.Println("Generating orders...")
+	wg.Wait()
+	for i:=0;i<5;i++{
 	go processor.ProcessOrders(orderChannel, quitChannel)
-
-	// Работаем 10 секунд, потом останавливаемся
+	}
+	// Р`аботаем 10 секунд, потом останавливаемся
 	time.Sleep(10 * time.Second)
 	quitChannel <- true
 	quitChannel <- true // Останавливаем обе горутины
-
+	
 	log.Println("Система завершена.")
 }
